@@ -1,0 +1,135 @@
+---
+title: "Demonstration of using GRASS from R"
+author: "Floris Vanderhaeghe"
+date: "2021-06-17"
+site: bookdown::bookdown_site
+output: 
+  bookdown::html_document2:
+    number_sections: yes
+    fig_caption: yes
+    df_print: paged
+    toc: TRUE
+    toc_depth: 4
+    toc_float:
+      collapsed: FALSE
+      smooth_scroll: FALSE
+    includes:
+        in_header: header.html
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+execshell <- function(commandstring, intern = FALSE, ...) {
+  if (.Platform$OS.type == "windows") {
+    res <- shell(commandstring, intern = TRUE, ...)
+  } else {
+    res <- system(commandstring, intern = TRUE, ...)
+  }
+  if (!intern) {
+    if (length(res) > 0) cat(res, sep = "\n") else return(invisible())
+    } else return(res)
+}
+```
+
+```{r message=FALSE}
+library(rgrass7)
+use_sf()
+library(tmap)
+library(dplyr)
+```
+
+# Initializing a temporary GRASS project
+
+```{r}
+gisbase_grass <- ifelse(.Platform$OS.type == "windows", 
+                        link2GI::paramGRASSw()$gisbase_GRASS[1],
+                        link2GI::paramGRASSx()$gisbase_GRASS[1])
+initGRASS(gisBase = gisbase_grass,
+          home = tempdir(), 
+          mapset = "PERMANENT")
+stringexecGRASS("g.proj -c --quiet epsg=31370")
+```
+
+# GRASS workflow
+
+## Loading data from WFS
+
+In case GRASS will work directly on pre-existing data in the cloud or on disk,
+it's more efficient to let GRASS load those directly than to read them in R and
+then use `rgrass7::writeXXX()`.
+The latter will first write a temporary GPKG or GeoTIFF file from R, after which
+GRASS is instructed to read that file.
+So that route is most convenient for intermediate data created in R.
+
+```{r}
+execshell("v.in.ogr input='https://geoservices.informatievlaanderen.be/overdrachtdiensten/BWK/wfs?service=WFS&request=GetFeature&typename=BWK%3ABwkhab&bbox=130000%2C184000%2C138000%2C194000' output=habbox -o")
+# execGRASS() currently has bug because of '&' in URL:
+# url <- "https://geoservices.informatievlaanderen.be/overdrachtdiensten/BWK/wfs?service=WFS&request=GetFeature&typename=BWK%3ABwkhab&bbox=130000%2C184000%2C138000%2C194000"
+# execGRASS("v.in.ogr",
+#           "o",
+#           input = url,
+#           output = "habbox")
+```
+
+
+```{r}
+stringexecGRASS("v.info map=habbox")
+stringexecGRASS("v.info -c map=habbox")
+```
+
+## Dissolving polygon borders
+
+```{r warning=FALSE}
+stringexecGRASS("v.dissolve input=habbox output=habeval column=EVAL")
+stringexecGRASS("v.db.select map=habeval")
+```
+
+## Rasterizing result
+
+```{r}
+# note that stringexecGRASS() cannot split '-sa' as 
+# '-s -a', which is needed for execGRASS()
+execshell("g.region vector=habeval res=1 -sa
+           g.region -p
+           v.to.rast input=habeval output=reval use=cat label_column=EVAL memory=2048")
+```
+
+# Read results as R object
+
+```{r warning=FALSE}
+result <- readVECT("habeval")
+```
+
+```{r fig.cap="Result after dissolve step (dataset `habeval`)"}
+tm_shape(result) + tm_polygons("EVAL")
+```
+
+
+# Used environment
+
+## Platform
+
+```{r session-info, results = "asis", echo=FALSE}
+si <- sessioninfo::session_info()
+p <- si$platform %>%
+  do.call(what = "c")
+if ("sf" %in% si$packages$package) {
+  p <- c(p, sf::sf_extSoftVersion())
+  names(p)[names(p) == "proj.4"] <- "PROJ"
+}
+if ("rgrass7" %in% si$packages$package) {
+  p <- c(p, GRASS = link2GI::findGRASS()[1, "version"])
+}
+sprintf("- **%s**: %s\n", names(p), p) %>%
+  cat(sep = "")
+```
+
+## R packages
+
+```{r results = "asis", echo=FALSE}
+si$packages %>%
+    as_tibble %>%
+    select(package, loadedversion, date, source) %>%
+pander::pandoc.table(caption = "(\\#tab:sessioninfo)Loaded R packages",
+                     split.table = Inf)
+```
