@@ -31,6 +31,10 @@ execshell <- function(commandstring, intern = FALSE, ...) {
 }
 ```
 
+The source code of this file can be found [at GitHub](https://github.com/florisvdh/demos/tree/master/src/20210617_grass).
+
+An accompanying presentation is at <https://florisvdh.github.io/presentations/20210617_grass>.
+
 ```{r message=FALSE}
 library(rgrass7)
 use_sf()
