@@ -1,7 +1,7 @@
 ---
 title: "Demonstration of using GRASS from R"
 author: "Floris Vanderhaeghe"
-date: "2021-06-17"
+date: "2021-06-17 (updated `r Sys.Date()`)"
 site: bookdown::bookdown_site
 output: 
   bookdown::html_document2:
@@ -66,13 +66,11 @@ GRASS is instructed to read that file.
 So that route is most convenient for intermediate data created in R.
 
 ```{r}
-execshell("v.in.ogr input='https://geoservices.informatievlaanderen.be/overdrachtdiensten/BWK/wfs?service=WFS&request=GetFeature&typename=BWK%3ABwkhab&bbox=130000%2C184000%2C138000%2C194000' output=habbox -o")
-# execGRASS() currently has bug because of '&' in URL:
-# url <- "https://geoservices.informatievlaanderen.be/overdrachtdiensten/BWK/wfs?service=WFS&request=GetFeature&typename=BWK%3ABwkhab&bbox=130000%2C184000%2C138000%2C194000"
-# execGRASS("v.in.ogr",
-#           "o",
-#           input = url,
-#           output = "habbox")
+url <- "'https://geoservices.informatievlaanderen.be/overdrachtdiensten/BWK/wfs?service=WFS&request=GetFeature&typename=BWK%3ABwkhab&bbox=130000%2C184000%2C138000%2C194000'"
+execGRASS("v.in.ogr",
+          "o",
+          input = url,
+          output = "habbox")
 ```
 
 
